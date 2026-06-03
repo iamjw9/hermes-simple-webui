@@ -1,0 +1,21 @@
+# Production files
+index.html
+proxy-server.py
+*.pyc
+__pycache__/
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
