@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">Hermes 管理面板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<style>
+:root {
+  --primary: #1F4E79;
+  --primary-light: #2A6B9E;
+  --primary-dark: #163A5C;
+  --gray: #525252;
+  --gray-light: #8A8A8A;
+  --bg: #F0F4F8;
+  --card-bg: rgba(255,255,255,0.92);
+  --shadow: 0 8px 32px rgba(31,78,121,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --green: #2E7D32;
+  --green-bg: #E8F5E9;
+  --red: #C62828;
+  --red-bg: #FBE9E7;
+  --orange: #E65100;
+  --orange-bg: #FFF3E0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+  background: var(--bg); color: #000; min-height: 100vh; overflow-x: hidden;
+}
+.hex-bg {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0; overflow: hidden;
+}
+.hex {
+  position: absolute; border: 1.5px solid; opacity: 0.07;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+/* Header */
+.header {
+  position: relative; z-index: 10;
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  color: #fff; padding: 0 20px; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 2px 16px rgba(31,78,121,0.25);
+}
+.header-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 17px; font-weight: 700; letter-spacing: 1px; flex-shrink: 0;
+}
+.header-right {
+  display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; justify-content: flex-end;
+}
+.server-select {
+  background: rgba(255,255,255,0.12);
+  padding: 4px 10px 4px 14px; border-radius: 16px; font-size: 11px;
+  border: none; color: #fff; cursor: pointer; appearance: none;
+  outline: none; transition: background 0.2s; max-width: 180px;
+}
+.server-select:hover { background: rgba(255,255,255,0.2); }
+.server-select option { background: var(--primary-dark); color: #fff; }
+.lang-group { display: flex; gap: 2px; background: rgba(255,255,255,0.08); border-radius: 14px; padding: 2px; }
+.lang-group button {
+  background: transparent; border: none; color: rgba(255,255,255,0.55);
+  padding: 3px 10px; border-radius: 12px; cursor: pointer; font-size: 11px;
+  transition: all 0.2s; font-weight: 500;
+}
+.lang-group button.active { background: #fff; color: var(--primary); }
+.lang-group button:hover:not(.active) { color: rgba(255,255,255,0.85); }
+.version-badge { opacity: 0.45; font-size: 10px; display: none; }
+@media (min-width: 480px) { .version-badge { display: inline; } }
+@media (min-width: 768px) {
+  .header { padding: 0 32px; height: 64px; }
+  .header-logo { font-size: 20px; gap: 12px; }
+  .header-right { gap: 16px; font-size: 13px; }
+  .server-select { font-size: 12px; padding: 4px 14px 4px 18px; }
+  .lang-group button { padding: 4px 14px; font-size: 12px; }
+  .version-badge { font-size: 11px; }
+}
+
+/* Main */
+.main { position: relative; z-index: 10; max-width: 1200px; margin: 0 auto; padding: 16px 12px; }
+@media (min-width: 768px) { .main { padding: 24px 20px; } }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 3px; margin-bottom: 16px;
+  background: rgba(255,255,255,0.7); border-radius: var(--radius-sm);
+  padding: 3px; backdrop-filter: blur(8px); box-shadow: var(--shadow);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 0 0 auto; padding: 8px 10px; text-align: center; cursor: pointer;
+  border-radius: var(--radius-sm); font-size: 11px; font-weight: 500;
+  color: var(--gray); transition: all 0.2s; border: none; background: transparent;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--primary); background: rgba(31,78,121,0.06); }
+.tab.active { color: #fff; background: var(--primary); box-shadow: 0 2px 8px rgba(31,78,121,0.3); }
+@media (min-width: 480px) {
+  .tab { padding: 10px 14px; font-size: 12px; }
+}
+@media (min-width: 768px) {
+  .tabs { gap: 4px; margin-bottom: 24px; border-radius: var(--radius); padding: 4px; flex-wrap: wrap; }
+  .tab { flex: 1; padding: 12px 16px; font-size: 14px; }
+}
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: block; }
+.card {
+  background: var(--card-bg); border-radius: var(--radius);
+  box-shadow: var(--shadow); backdrop-filter: blur(8px);
+  padding: 24px; margin-bottom: 20px;
+}
+.card-title {
+  font-size: 16px; font-weight: 700; color: var(--primary);
+  margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 2px solid rgba(31,78,121,0.1);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Provider */
+.provider-list { display: flex; flex-direction: column; gap: 8px; }
+.provider-item {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(31,78,121,0.12);
+  overflow: hidden; transition: all 0.2s;
+}
+.provider-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; cursor: pointer;
+  transition: background 0.2s;
+}
+.provider-header:hover { background: rgba(31,78,121,0.03); }
+.provider-info { display: flex; align-items: center; gap: 14px; }
+.provider-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.provider-meta { min-width: 0; }
+.provider-name { font-weight: 600; font-size: 14px; }
+.provider-desc { font-size: 12px; color: var(--gray-light); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-badges { display: flex; align-items: center; gap: 8px; }
+.provider-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; }
+.provider-status.online { background: var(--green-bg); color: var(--green); }
+.provider-status.offline { background: var(--red-bg); color: var(--red); }
+.provider-body {
+  display: none; padding: 0 18px 14px; border-top: 1px solid rgba(31,78,121,0.06);
+}
+.provider-body.open { display: block; }
+.provider-models {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0;
+}
+.model-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 14px; font-size: 12px;
+  background: rgba(31,78,121,0.06); color: var(--primary);
+  border: 1px solid rgba(31,78,121,0.15);
+}
+.model-tag.global {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.model-tag .set-global {
+  font-size: 10px; cursor: pointer; opacity: 0.7;
+}
+.model-tag .set-global:hover { opacity: 1; }
+.provider-footer {
+  display: flex; gap: 6px; margin-top: 8px;
+}
+
+/* Buttons */
+.btn {
+  padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 500; transition: all 0.2s; display: inline-flex;
+  align-items: center; gap: 4px;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-light); }
+.btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+.btn-outline:hover { background: var(--primary); color: #fff; }
+.btn-danger { background: transparent; border: 1px solid #E53935; color: #E53935; }
+.btn-danger:hover { background: #E53935; color: #fff; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover { background: #388E3C; }
+.btn-sm { font-size: 11px; padding: 4px 10px; }
+.btn-lg { padding: 8px 20px; font-size: 13px; }
+
+/* Forms */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-row.full { grid-template-columns: 1fr; }
+.form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--gray); }
+.form-group input, .form-group select {
+  padding: 8px 12px; border: 1.5px solid rgba(31,78,121,0.15);
+  border-radius: 6px; font-size: 13px; outline: none;
+  transition: border-color 0.2s; background: #fff;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.model-checkboxes {
+  display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px;
+  overflow-y: auto; padding: 8px; border: 1px solid rgba(31,78,121,0.12);
+  border-radius: 6px; background: #fafafa;
+}
+.model-checkbox {
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+  padding: 3px 8px; border-radius: 4px; cursor: pointer; user-select: none;
+}
+.model-checkbox:hover { background: rgba(31,78,121,0.06); }
+.model-checkbox input { accent-color: var(--primary); }
+
+/* Terminal */
+.terminal-wrap {
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid rgba(31,78,121,0.15);
+}
+#terminalContainer {
+  width: 100%; height: 420px;
+}
+#terminalContainer .xterm { height: 100%; padding: 4px; }
+#terminalContainer .xterm-viewport { scrollbar-width: thin; }
+/* Legacy mock terminal (local mode fallback) */
+.mock-terminal {
+  background: #1a1a2e; padding: 16px;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 13px; line-height: 1.6; color: #e0e0e0;
+  min-height: 380px; overflow-y: auto;
+}
+.mock-terminal .line { white-space: pre-wrap; word-break: break-all; }
+.mock-terminal .prompt { color: #4CAF50; }
+.mock-terminal .output { color: #e0e0e0; }
+.mock-terminal .error { color: #EF5350; }
+.mock-terminal .info { color: #42A5F5; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.stat-card {
+  background: var(--card-bg); border-radius: var(--radius-sm);
+  padding: 12px; text-align: center; box-shadow: 0 2px 8px rgba(31,78,121,0.08);
+}
+.stat-card .number { font-size: 16px; font-weight: 700; color: var(--primary); }
+.stat-card .label { font-size: 10px; color: var(--gray-light); margin-top: 2px; }
+@media (min-width: 400px) { .stats-grid { gap: 10px; } .stat-card { padding: 14px; } .stat-card .number { font-size: 20px; } }
+@media (min-width: 600px) { .stats-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; } .stat-card { padding: 18px; } .stat-card .number { font-size: 24px; } .stat-card .label { font-size: 12px; } }
+
+/* Per-model stats */
+.model-stats-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 600px) { .model-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .model-stats-grid { grid-template-columns: repeat(3, 1fr); } }
+.model-stat-card {
+  background: var(--card-bg); border-radius: var(--radius-sm);
+  padding: 16px; box-shadow: 0 2px 8px rgba(31,78,121,0.08);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.model-stat-header {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.model-stat-name { font-size: 13px; font-weight: 600; color: var(--primary); }
+.model-stat-reqs { font-size: 11px; color: var(--gray-light); }
+.model-stat-bar-group { display: flex; flex-direction: column; gap: 4px; }
+.model-stat-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray); }
+.model-stat-bar {
+  height: 8px; border-radius: 4px; background: #eee; overflow: hidden; position: relative;
+}
+.model-stat-bar .fill {
+  height: 100%; border-radius: 4px; transition: width 0.6s ease; position: relative;
+}
+.model-stat-bar .fill-input { background: var(--primary); }
+.model-stat-bar .fill-output { background: var(--primary-light); }
+.model-stat-bar .fill-cache {
+  height: 10px; border-radius: 5px;
+}
+.fill-cache.high { background: var(--green); }
+.fill-cache.mid { background: #F57F17; }
+.fill-cache.low { background: var(--red); }
+
+/* Gateway */
+.gateway-list { display: flex; flex-direction: column; gap: 10px; }
+.gateway-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-radius: var(--radius-sm);
+  border: 1px solid rgba(31,78,121,0.12);
+}
+.gateway-info { display: flex; align-items: center; gap: 14px; }
+.gateway-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.gateway-name { font-weight: 600; font-size: 14px; }
+.gateway-desc { font-size: 12px; color: var(--gray-light); margin-top: 2px; }
+.gateway-status { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.gateway-status .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.gateway-status .dot.active { background: var(--green); }
+.gateway-status .dot.inactive { background: var(--gray-light); }
+.gateway-status .dot.error { background: var(--red); }
+
+/* Toggle switch */
+.toggle { position: relative; display: inline-block; width: 42px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: #ccc; border-radius: 22px; transition: 0.3s;
+}
+.toggle .slider::before {
+  content: ""; position: absolute; height: 16px; width: 16px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s;
+}
+.toggle input:checked + .slider { background: var(--primary); }
+.toggle input:checked + .slider::before { transform: translateX(20px); }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 100; backdrop-filter: blur(4px);
+  justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff; border-radius: var(--radius); width: 90%; max-width: 620px;
+  max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  padding: 28px; position: relative;
+}
+.modal-close {
+  position: absolute; top: 16px; right: 16px; background: none; border: none;
+  font-size: 24px; cursor: pointer; color: var(--gray); line-height: 1;
+}
+.modal h2 { font-size: 18px; color: var(--primary); margin-bottom: 20px; }
+.test-result {
+  margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px;
+  display: none;
+}
+.test-result.success { display: block; background: var(--green-bg); color: var(--green); }
+.test-result.fail { display: block; background: var(--red-bg); color: var(--red); }
+
+/* Responsive */
+@media (max-width: 399px) {
+  .main { padding: 10px 8px; }
+  .header-logo span[data-i18n="header.subtitle"] { display: none; }
+  .server-select { font-size: 10px; padding: 2px 6px; max-width: 110px; }
+  .card { padding: 12px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; margin-bottom: 10px; padding-bottom: 8px; }
+  .stats-grid { gap: 6px; }
+  .stat-card .number { font-size: 14px; }
+  .stat-card .label { font-size: 9px; }
+  .model-stat-card { padding: 12px; gap: 6px; }
+  .model-stat-name { font-size: 11px; }
+  .model-stat-bar-label { font-size: 10px; }
+  .model-stat-bar { height: 6px; }
+  .provider-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .provider-badges { align-self: flex-end; }
+  .provider-icon { width: 28px; height: 28px; font-size: 11px; }
+  .provider-name { font-size: 12px; }
+  .provider-desc { font-size: 10px; }
+  .model-tag { font-size: 10px; padding: 2px 7px; }
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+  #terminalContainer { height: 260px; }
+  .gateway-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .gateway-name { font-size: 12px; }
+  .gateway-desc { font-size: 10px; }
+  .modal { padding: 16px; width: 96%; }
+  .model-checkboxes { max-height: 100px; }
+  .model-checkbox { font-size: 10px; }
+  #globalModelCard .form-row { grid-template-columns: 1fr !important; gap: 6px; }
+  .provider-body { padding: 0 12px 10px !important; }
+  .provider-footer .btn { font-size: 10px; padding: 3px 8px; }
+}
+@media (min-width: 400px) and (max-width: 599px) {
+  .main { padding: 12px 10px; }
+  .header-logo span[data-i18n="header.subtitle"] { display: none; }
+  .server-select { font-size: 10px; padding: 3px 8px; max-width: 130px; }
+  .card { padding: 14px; }
+  .provider-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .provider-badges { align-self: flex-end; }
+  .provider-icon { width: 32px; height: 32px; font-size: 13px; }
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+  #terminalContainer { height: 300px; }
+  .gateway-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .modal { padding: 20px; width: 95%; }
+  .model-checkboxes { max-height: 120px; }
+  #globalModelCard .form-row { grid-template-columns: 1fr !important; gap: 8px; }
+}
+@media (max-width: 768px) {
+  .provider-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .provider-badges { align-self: flex-end; }
+  .form-actions .btn { flex: 1; }
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+@media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } .form-row.three { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="hex-bg" id="hexBg"></div>
+
+<header class="header">
+  <div class="header-logo">
+    <span>⬡ Hermes</span>
+    <span style="font-size:14px;opacity:0.6" data-i18n="header.subtitle">管理面板</span>
+  </div>
+  <div class="header-right">
+    <select class="server-select" id="serverSelect" onchange="switchServer(this.value)">
+      <option value="hangzhou"><span class="dot"></span> 杭州 · hycoforce.com</option>
+      <option value="tokyo">🗼 东京 · 128.1.49.125</option>
+    </select>
+    <div class="lang-group">
+      <button class="active" data-lang="zh" onclick="setLang('zh')">中文</button>
+      <button data-lang="en" onclick="setLang('en')">English</button>
+    </div>
+    <span class="version-badge">v0.1.0</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" data-tab="models" data-i18n="tab.models">⚙ 模型设置</button>
+    <button class="tab" data-tab="cli" data-i18n="tab.cli">⌨ CLI 终端</button>
+    <button class="tab" data-tab="usage" data-i18n="tab.usage">📊 用量统计</button>
+    <button class="tab" data-tab="gateway" data-i18n="tab.gateway">🌐 网关控制</button>
+  </div>
+
+  <!-- ===== Models Panel ===== -->
+  <div class="panel active" id="panelModels">
+    <div class="card" id="globalModelCard">
+      <div class="card-title">
+        <span data-i18n="models.globalTitle">🌐 全局模型</span>
+        <span id="globalModelBadge" style="font-size:12px;font-weight:400;color:var(--gray-light)">deepseek-v4-flash</span>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr auto;align-items:center">
+        <select id="globalModelSelect" onchange="setGlobalModel(this.value)" style="padding:8px 12px;border:1.5px solid rgba(31,78,121,0.15);border-radius:6px;font-size:13px;outline:none;background:#fff;cursor:pointer">
+          <option value="" data-i18n="models.globalPlaceholder">请选择全局默认模型</option>
+        </select>
+        <span id="globalSyncStatus" style="font-size:11px;color:var(--green);display:none">✓ 已同步</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span data-i18n="models.title">Provider 列表</span>
+        <span style="font-size:12px;font-weight:400;color:var(--gray-light)" id="activeServerLabel">杭州 · hycoforce.com</span>
+      </div>
+      <div class="provider-list" id="providerList"></div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="showAddProvider()"><span data-i18n="models.addBtn">+ 添加 Provider</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CLI Panel ===== -->
+  <div class="panel" id="panelCli">
+    <div class="card">
+      <div class="card-title">
+        <span data-i18n="cli.title">Hermes 命令终端</span>
+        <span id="ptyStatus" style="font-size:12px;margin-left:12px;color:var(--gray-light)">● idle</span>
+      </div>
+      <div class="terminal-wrap" style="padding:0">
+        <div class="terminal" id="terminalContainer" style="height:380px"></div>
+        <div style="display:flex;border-top:1px solid rgba(31,78,121,0.15)">
+          <span style="padding:6px 8px;font-size:12px;color:var(--gray-light);white-space:nowrap">❯</span>
+          <input id="ptyInput" type="text" style="flex:1;border:none;background:transparent;padding:6px 4px;font-family:Consolas,'Courier New',monospace;font-size:13px;color:var(--text);outline:none" placeholder="Type here..." autocomplete="off" spellcheck="false">
+          <span id="ptyInputStatus" style="padding:6px 8px;font-size:11px;color:var(--gray-light)">● idle</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Usage Panel ===== -->
+  <div class="panel" id="panelUsage">
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="number" id="statTotalTokens">-</div><div class="label" data-i18n="usage.totalTokens">总 Token 用量</div></div>
+      <div class="stat-card"><div class="number" id="statInputTokens">-</div><div class="label" data-i18n="usage.inputTokens">Input Tokens</div></div>
+      <div class="stat-card"><div class="number" id="statOutputTokens">-</div><div class="label" data-i18n="usage.outputTokens">Output Tokens</div></div>
+      <div class="stat-card"><div class="number" id="statSessions">-</div><div class="label" data-i18n="usage.sessions">会话数</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span data-i18n="usage.byModel">逐模型统计</span></div>
+      <div class="model-stats-grid" id="modelStatsGrid"></div>
+    </div>
+  </div>
+
+  <!-- ===== Gateway Panel ===== -->
+  <div class="panel" id="panelGateway">
+    <div class="card">
+      <div class="card-title" data-i18n="gateway.title">网关通道列表</div>
+      <div class="gateway-list" id="gatewayList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Add/Edit Provider Modal ===== -->
+<div class="modal-overlay" id="providerModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('providerModal')">&times;</button>
+    <h2 id="providerModalTitle" data-i18n="providerModal.title">添加 Provider</h2>
+    <form onsubmit="saveProvider(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="providerModal.name">Provider 名称</label>
+          <input type="text" id="provName" required>
+        </div>
+        <div class="form-group">
+          <label data-i18n="providerModal.baseUrl">API Base URL</label>
+          <input type="text" id="provBaseUrl" placeholder="https://api.openai.com/v1" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="providerModal.apiKey">API Key</label>
+          <input type="password" id="provApiKey">
+        </div>
+        <div class="form-group" style="justify-content:flex-end;padding-top:18px">
+          <button type="button" class="btn btn-sm btn-outline" onclick="testConnection()" data-i18n="providerModal.testBtn">🔌 测试连接</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="testMultimodal()" data-i18n="providerModal.multiBtn">🖼 多模态测试</button>
+        </div>
+      </div>
+      <div id="testResult" class="test-result"></div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label data-i18n="providerModal.models">可用模型 <span style="font-weight:400;color:var(--gray-light)" data-i18n="providerModal.modelsHint">（测试连接后自动获取，可多选）</span></label>
+          <div class="model-checkboxes" id="modelCheckboxes">
+            <div style="color:var(--gray-light);font-size:12px;padding:8px" data-i18n="providerModal.modelsPlaceholder">请先点击"测试连接"获取模型列表</div>
+          </div>
+          <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-outline" onclick="selectAllModels()" data-i18n="providerModal.selectAll">全选</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="deselectAllModels()" data-i18n="providerModal.deselectAll">取消全选</button>
+            <input type="text" id="customModelInput" placeholder="自定义输入模型名" style="flex:1;min-width:120px;padding:4px 8px;border:1px solid rgba(31,78,121,0.15);border-radius:4px;font-size:12px">
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" onclick="closeModal('providerModal')" data-i18n="common.cancel">取消</button>
+        <button type="submit" class="btn btn-primary" data-i18n="common.save">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ======================== 六边形背景 ========================
+(function() {
+  const c = document.getElementById('hexBg');
+  for (let i = 0; i < 80; i++) {
+    const h = document.createElement('div');
+    h.className = 'hex';
+    const s = 30 + Math.random() * 100;
+    h.style.width = s + 'px'; h.style.height = (s * 1.1547) + 'px';
+    h.style.left = Math.random() * 100 + '%'; h.style.top = Math.random() * 100 + '%';
+    h.style.borderColor = ['#1F4E79','#525252','#000'][Math.floor(Math.random() * 3)];
+    h.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+    c.appendChild(h);
+  }
+})();
+
+// ======================== i18n ========================
+const i18n = {
+  zh: {
+    'header.subtitle': '管理面板',
+    'tab.models': '⚙ 模型设置',
+    'tab.cli': '⌨ CLI 终端',
+    'tab.usage': '📊 用量统计',
+    'tab.gateway': '🌐 网关控制',
+    'models.title': 'Provider 列表',
+    'models.addBtn': '+ 添加 Provider',
+    'models.globalTitle': '🌐 全局模型',
+    'models.globalPlaceholder': '请选择全局默认模型',
+    'cli.title': 'Hermes 命令终端',
+    'cli.bar': 'hermes@cli',
+    'cli.runBtn': '执行',
+    'cli.clearBtn': '清屏',
+    'usage.totalTokens': '总 Token 用量',
+    'usage.inputTokens': 'Input Tokens',
+    'usage.outputTokens': 'Output Tokens',
+    'usage.sessions': '会话数',
+    'usage.byModel': '逐模型统计',
+    'usage.cacheRate': '缓存命中率',
+    'usage.requests': '请求数',
+    'usage.input': '输入',
+    'usage.output': '输出',
+    'gateway.title': '网关通道列表',
+    'providerModal.title': '添加 Provider',
+    'providerModal.name': 'Provider 名称',
+    'providerModal.baseUrl': 'API Base URL',
+    'providerModal.apiKey': 'API Key',
+    'providerModal.testBtn': '🔌 测试连接',
+    'providerModal.multiBtn': '🖼 多模态测试',
+    'providerModal.models': '可用模型',
+    'providerModal.modelsHint': '（测试连接后自动获取，可多选）',
+    'providerModal.modelsPlaceholder': '请先点击"测试连接"获取模型列表',
+    'providerModal.selectAll': '全选',
+    'providerModal.deselectAll': '取消全选',
+    'common.cancel': '取消',
+    'common.save': '保存',
+    'common.edit': '编辑',
+    'common.delete': '删除',
+    'common.testOk': '连接成功',
+    'common.testFail': '连接失败',
+    'common.global': '全局',
+    'common.setGlobal': '设为全局',
+    'common.active': '运行中',
+    'common.inactive': '已停止',
+    'common.error': '异常',
+    'server.hangzhou': '杭州 · hycoforce.com',
+    'server.tokyo': '东京 · 128.1.49.125',
+    'cli.placeholder': '输入命令（help 查看可用命令）',
+    'cli.welcome1': '╔══════════════════════════════════════════╗',
+    'cli.welcome2': '║  Hermes CLI · 输入命令开始操作          ║',
+    'cli.welcome3': '╚══════════════════════════════════════════╝',
+    'gateway.status.active': '运行中',
+    'gateway.status.inactive': '已停止',
+    'gateway.status.error': '异常',
+    'gateway.start': '启动',
+    'gateway.stop': '停止',
+    'providerModal.customInput': '自定义输入模型名',
+  },
+  en: {
+    'header.subtitle': 'Dashboard',
+    'tab.models': '⚙ Models',
+    'tab.cli': '⌨ CLI Terminal',
+    'tab.usage': '📊 Usage Stats',
+    'tab.gateway': '🌐 Gateway',
+    'models.title': 'Providers',
+    'models.addBtn': '+ Add Provider',
+    'models.globalTitle': '🌐 Global Model',
+    'models.globalPlaceholder': 'Select default model',
+    'cli.title': 'Hermes Command Terminal',
+    'cli.bar': 'hermes@cli',
+    'cli.runBtn': 'Run',
+    'cli.clearBtn': 'Clear',
+    'usage.totalTokens': 'Total Tokens',
+    'usage.inputTokens': 'Input Tokens',
+    'usage.outputTokens': 'Output Tokens',
+    'usage.sessions': 'Sessions',
+    'usage.byModel': 'Stats by Model',
+    'usage.cacheRate': 'Cache Hit Rate',
+    'usage.requests': 'Requests',
+    'usage.input': 'Input',
+    'usage.output': 'Output',
+    'gateway.title': 'Gateway Channels',
+    'providerModal.title': 'Add Provider',
+    'providerModal.name': 'Provider Name',
+    'providerModal.baseUrl': 'API Base URL',
+    'providerModal.apiKey': 'API Key',
+    'providerModal.testBtn': '🔌 Test Connection',
+    'providerModal.multiBtn': '🖼 Test Multimodal',
+    'providerModal.models': 'Available Models',
+    'providerModal.modelsHint': '(auto-detect after test, multi-select)',
+    'providerModal.modelsPlaceholder': 'Click "Test Connection" first',
+    'providerModal.selectAll': 'Select All',
+    'providerModal.deselectAll': 'Deselect All',
+    'common.cancel': 'Cancel',
+    'common.save': 'Save',
+    'common.edit': 'Edit',
+    'common.delete': 'Delete',
+    'common.testOk': 'Connection successful',
+    'common.testFail': 'Connection failed',
+    'common.global': 'Global',
+    'common.setGlobal': 'Set as Global',
+    'common.active': 'Active',
+    'common.inactive': 'Stopped',
+    'common.error': 'Error',
+    'server.hangzhou': 'Hangzhou · hycoforce.com',
+    'server.tokyo': 'Tokyo · 128.1.49.125',
+    'cli.placeholder': 'Enter command (help for list)',
+    'cli.welcome1': '╔══════════════════════════════════════════╗',
+    'cli.welcome2': '║  Hermes CLI · Enter a command to start  ║',
+    'cli.welcome3': '╚══════════════════════════════════════════╝',
+    'gateway.status.active': 'Active',
+    'gateway.status.inactive': 'Stopped',
+    'gateway.status.error': 'Error',
+    'gateway.start': 'Start',
+    'gateway.stop': 'Stop',
+    'providerModal.customInput': 'Custom model name',
+  }
+};
+
+let currentLang = 'zh';
+
+function t(key) { return i18n[currentLang][key] || key; }
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  const title = currentLang === 'zh' ? 'Hermes 管理面板' : 'Hermes Dashboard';
+  document.getElementById('pageTitle').textContent = title;
+  document.querySelectorAll('.lang-group button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+  });
+  renderProviders();
+  renderGateways();
+  renderModelStats();
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  applyI18n();
+}
+
+// ======================== Tab ========================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    const name = this.dataset.tab;
+    const panelId = 'panel' + name.charAt(0).toUpperCase() + name.slice(1);
+    document.getElementById(panelId).classList.add('active');
+    if (name === 'usage') renderModelStats();
+  });
+});
+
+// ======================== Server Switch ========================
+async function switchServer(val) {
+  window._hermesTarget = val;
+  if (IS_PRODUCTION) {
+    try {
+      const res = await fetch('/api/target', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: val }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('activeServerLabel').textContent = val === 'hangzhou' ? '杭州 · hycoforce.com' : '东京 · 128.1.49.125';
+        // Re-fetch token + data for new server
+        const tokRes = await fetch('/api/token');
+        const tokData = await tokRes.json();
+        if (tokData.token) API_TOKEN = tokData.token;
+        fetchRealData();
+        if (ptySocket || ptyTerm) setTimeout(connectPty, 500);
+        return;
+      }
+    } catch (e) {
+      console.log('Server switch failed:', e);
+    }
+  }
+  document.getElementById('activeServerLabel').textContent = val === 'hangzhou' ? '杭州 · hycoforce.com' : '东京 · 128.1.49.125';
+  window.location.reload();
+}
+
+// ======================== Modal ========================
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); });
+});
+
+// ======================== Provider Data ========================
+let globalModel = 'deepseek-v4-flash';
+let providers = [
+  { id: 'deepseek', name: 'DeepSeek', models: ['deepseek-v4-flash', 'deepseek-chat', 'deepseek-coder'], baseUrl: 'https://api.deepseek.com/v1', status: 'online' },
+  { id: 'opencode', name: 'Opencode', models: ['deepseek-v4-flash-free', 'opencode-go'], baseUrl: 'https://opencode.ai/zen/go/v1', status: 'online' },
+  { id: 'sensenova', name: 'SenseNova', models: ['deepseek-v4-flash', 'sensenova-6.7-flash-lite'], baseUrl: 'https://token.sensenova.cn/v1', status: 'online' },
+];
+
+function getAllModels() {
+  const set = new Set();
+  providers.forEach(p => p.models.forEach(m => set.add(m)));
+  return [...set];
+}
+
+function updateGlobalDropdown() {
+  const sel = document.getElementById('globalModelSelect');
+  const allModels = getAllModels();
+  const current = sel.value || globalModel;
+  sel.innerHTML = `<option value="">${t('models.globalPlaceholder')}</option>`
+    + allModels.map(m => `<option value="${m}" ${m === current ? 'selected' : ''}>${m}</option>`).join('');
+  document.getElementById('globalModelBadge').textContent = globalModel || '-';
+}
+
+function setGlobalModel(model) {
+  if (!model) return;
+  globalModel = model;
+  document.getElementById('globalModelBadge').textContent = model;
+  document.getElementById('globalSyncStatus').style.display = 'inline';
+  setTimeout(() => document.getElementById('globalSyncStatus').style.display = 'none', 2000);
+  renderProviders();
+}
+
+function renderProviders() {
+  const list = document.getElementById('providerList');
+  list.innerHTML = providers.map(p => {
+    const icon = p.name.charAt(0).toUpperCase();
+    const badge = p.status === 'online' ? 'online' : 'offline';
+    const badgeText = p.status === 'online' ? t('common.active') : t('common.inactive');
+    const modelsHtml = p.models.map(m => {
+      const isGlobal = m === globalModel;
+      return `<span class="model-tag ${isGlobal ? 'global' : ''}">${m}${isGlobal ? ' ★' : ''}</span>`;
+    }).join('');
+    return `<div class="provider-item">
+      <div class="provider-header" onclick="toggleProviderBody('${p.id}')">
+        <div class="provider-info">
+          <div class="provider-icon">${icon}</div>
+          <div class="provider-meta">
+            <div class="provider-name">${p.name}</div>
+            <div class="provider-desc">${p.baseUrl} · ${p.models.length} models</div>
+          </div>
+        </div>
+        <div class="provider-badges">
+          <span class="provider-status ${badge}">${badgeText}</span>
+          <span style="color:var(--gray-light);font-size:10px">▾</span>
+        </div>
+      </div>
+      <div class="provider-body" id="body-${p.id}">
+        <div style="font-size:12px;font-weight:600;color:var(--gray);margin:8px 0 4px">${currentLang === 'zh' ? '模型列表' : 'Models'}</div>
+        <div class="provider-models">${modelsHtml}</div>
+        <div class="provider-footer">
+          ${p.id.startsWith('custom:') ? `<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();editProvider('${p.id}')">✎ ${t('common.edit')}</button>` : ''}
+          ${p.id.startsWith('custom:') ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProvider('${p.id}')">✕ ${t('common.delete')}</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateGlobalDropdown();
+}
+
+function toggleProviderBody(id) {
+  const el = document.getElementById('body-' + id);
+  if (el) el.classList.toggle('open');
+}
+
+// ======================== Provider CRUD ========================
+let editingProviderId = null;
+let discoveredModels = [];
+
+function showAddProvider() {
+  editingProviderId = null;
+  discoveredModels = [];
+  document.getElementById('providerModalTitle').textContent = t('providerModal.title');
+  ['provName','provBaseUrl','provApiKey','customModelInput'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('testResult').style.display = 'none';
+  renderModelCheckboxes([]);
+  showModal('providerModal');
+}
+
+function editProvider(id) {
+  const p = providers.find(x => x.id === id);
+  if (!p) return;
+  editingProviderId = id;
+  discoveredModels = p.models;
+  document.getElementById('providerModalTitle').textContent = currentLang === 'zh' ? '编辑 Provider' : 'Edit Provider';
+  document.getElementById('provName').value = p.name;
+  document.getElementById('provBaseUrl').value = p.baseUrl;
+  document.getElementById('provApiKey').value = '';
+  document.getElementById('customModelInput').value = '';
+  document.getElementById('testResult').style.display = 'none';
+  renderModelCheckboxes(p.models);
+  showModal('providerModal');
+}
+
+async function deleteProvider(id) {
+  if (!confirm(currentLang === 'zh' ? '确定删除？' : 'Delete?')) return;
+  const name = id.startsWith('custom:') ? id.slice(7) : id;
+  providers = providers.filter(p => p.id !== id);
+  renderProviders();
+  try {
+    const config = await apiGet('/config');
+    if (config.custom_providers) {
+      config.custom_providers = config.custom_providers.filter(p => p.name !== name);
+    }
+    if (config.providers && config.providers[name]) {
+      delete config.providers[name];
+    }
+    await apiPut('/config', { config });
+  } catch (e) {
+    console.error('Backend sync failed:', e.message);
+    await loadProviders();
+  }
+}
+
+async function saveProvider(e) {
+  e.preventDefault();
+  const name = document.getElementById('provName').value.trim();
+  const baseUrl = document.getElementById('provBaseUrl').value.trim();
+  const apiKey = document.getElementById('provApiKey').value.trim();
+  if (!name || !baseUrl) return;
+
+  const checkedModels = [...document.querySelectorAll('#modelCheckboxes input:checked')].map(cb => cb.value);
+  const customModel = document.getElementById('customModelInput').value.trim();
+  const allModels = [...new Set([...checkedModels, ...(customModel ? [customModel] : [])])];
+  const primaryModel = allModels[0] || '';
+
+  const oldName = editingProviderId ? providers.find(x => x.id === editingProviderId)?.name : null;
+
+  if (editingProviderId) {
+    const p = providers.find(x => x.id === editingProviderId);
+    if (p) {
+      p.name = name;
+      if (editingProviderId.startsWith('custom:')) {
+        p.id = 'custom:' + name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      }
+      p.baseUrl = baseUrl;
+      if (apiKey) p.apiKey = apiKey;
+      if (allModels.length > 0) p.models = allModels;
+    }
+  } else {
+    const id = 'custom:' + name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    providers.push({
+      id, name, baseUrl, models: allModels.length > 0 ? allModels : [customModel || 'unknown'],
+      status: 'online', apiKey: apiKey || ''
+    });
+  }
+  renderProviders();
+  closeModal('providerModal');
+
+  try {
+    const config = await apiGet('/config');
+    const cps = config.custom_providers || [];
+    const entry = { name, base_url: baseUrl, model: primaryModel };
+    if (apiKey) entry.api_key = apiKey;
+    const lookupName = (editingProviderId && oldName) ? oldName : name;
+    const existingIdx = cps.findIndex(p => p.name === lookupName);
+    if (existingIdx >= 0) {
+      cps[existingIdx] = { ...cps[existingIdx], ...entry };
+    } else {
+      cps.push(entry);
+    }
+    config.custom_providers = cps;
+    await apiPut('/config', { config });
+  } catch (e) {
+    console.error('Backend sync failed:', e.message);
+    await loadProviders();
+  }
+}
+
+// ======================== Model Checkboxes ========================
+function renderModelCheckboxes(models) {
+  const container = document.getElementById('modelCheckboxes');
+  if (!models || models.length === 0) {
+    container.innerHTML = `<div style="color:var(--gray-light);font-size:12px;padding:8px">${t('providerModal.modelsPlaceholder')}</div>`;
+    return;
+  }
+  container.innerHTML = models.map(m => {
+    const checked = !editingProviderId || (providers.find(p => p.id === editingProviderId)?.models || []).includes(m);
+    return `<label class="model-checkbox"><input type="checkbox" value="${m}" ${checked ? 'checked' : ''}> ${m}</label>`;
+  }).join('');
+}
+
+function selectAllModels() {
+  document.querySelectorAll('#modelCheckboxes input[type=checkbox]').forEach(cb => cb.checked = true);
+}
+
+function deselectAllModels() {
+  document.querySelectorAll('#modelCheckboxes input[type=checkbox]').forEach(cb => cb.checked = false);
+}
+
+// ======================== Test Connection (real API) ========================
+function normalizeBaseUrl(url) {
+  url = url.trim().replace(/\/+$/, '');
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  return url.replace(/\/+$/, '');
+}
+
+async function testConnection() {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  el.className = 'test-result';
+  el.textContent = currentLang === 'zh' ? '⏳ 正在测试连接...' : '⏳ Testing connection...';
+
+  const baseUrl = normalizeBaseUrl(document.getElementById('provBaseUrl').value);
+  const apiKey = document.getElementById('provApiKey').value.trim();
+  document.getElementById('provBaseUrl').value = baseUrl;
+
+  if (!baseUrl) {
+    el.className = 'test-result fail';
+    el.textContent = currentLang === 'zh' ? '请先输入 API Base URL' : 'Please enter API Base URL first';
+    return;
+  }
+  if (!apiKey) {
+    el.className = 'test-result fail';
+    el.textContent = currentLang === 'zh' ? '请先输入 API Key' : 'Please enter API Key first';
+    return;
+  }
+
+  // Try /v1/models, /models, and base URL itself
+  const endpoints = [
+    baseUrl.replace(/\/v1$/, '') + '/v1/models',
+    baseUrl + '/models',
+    baseUrl.replace(/\/v1$/, '') + '/models',
+  ];
+
+  let models = [];
+  let lastError = '';
+
+  for (const endpoint of endpoints) {
+    try {
+      const resp = await fetch(endpoint, {
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }
+      });
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '');
+        lastError = 'HTTP ' + resp.status + (text ? ': ' + text.slice(0, 120) : '');
+        continue;
+      }
+      const data = await resp.json();
+      if (data.data && Array.isArray(data.data)) {
+        models = data.data.map(m => typeof m === 'string' ? m : (m.id || m.model || ''));
+      } else if (Array.isArray(data)) {
+        models = data.map(m => typeof m === 'string' ? m : (m.id || m.model || ''));
+      } else if (data.models && Array.isArray(data.models)) {
+        models = data.models.map(m => typeof m === 'string' ? m : (m.id || m.model || ''));
+      }
+      if (models.length > 0) break;
+      lastError = currentLang === 'zh' ? '返回格式异常' : 'Unexpected response format';
+    } catch (err) {
+      lastError = err.message;
+    }
+  }
+
+  if (models.length > 0) {
+    discoveredModels = models;
+    el.className = 'test-result success';
+    el.textContent = (currentLang === 'zh' ? '✅ 连接成功！发现 ' : '✅ Connected! Found ') + models.length + ' models';
+    renderModelCheckboxes(models);
+  } else {
+    discoveredModels = [];
+    el.className = 'test-result fail';
+    el.textContent = (currentLang === 'zh' ? '❌ 连接失败: ' : '❌ Connection failed: ') + lastError;
+    renderModelCheckboxes([]);
+  }
+}
+
+async function testMultimodal() {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  el.className = 'test-result';
+  el.textContent = currentLang === 'zh' ? '⏳ 测试多模态能力...' : '⏳ Testing multimodal...';
+
+  // Detect vision-capable models by name patterns
+  const visionKeywords = ['vision', 'gpt-4o', 'gemini-pro', 'gemini-ultra', 'claude-3-opus', 'claude-3-sonnet', 'llava', 'cogvlm', 'qwen-vl', 'internvl', 'yi-vision'];
+  const detected = discoveredModels.filter(m => visionKeywords.some(k => m.toLowerCase().includes(k)));
+
+  if (detected.length > 0) {
+    el.className = 'test-result success';
+    el.textContent = (currentLang === 'zh' ? '✅ 支持多模态！检测到 ' : '✅ Multimodal supported! Detected ')
+      + detected.length + ' ' + (currentLang === 'zh' ? '个视觉模型' : 'vision models')
+      + ': ' + detected.slice(0, 4).join(', ') + (detected.length > 4 ? '...' : '');
+    return;
+  }
+
+  // If no vision model detected by name, try a real API call with a small image
+  if (discoveredModels.length > 0 && document.getElementById('provBaseUrl').value.trim()) {
+    const baseUrl = normalizeBaseUrl(document.getElementById('provBaseUrl').value);
+    const apiKey = document.getElementById('provApiKey').value.trim();
+    const testModel = discoveredModels[0];
+    const endpoint = baseUrl.replace(/\/v1$/, '') + '/v1/chat/completions';
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: testModel,
+          messages: [
+            { role: 'user', content: [
+              { type: 'text', text: 'describe this image' },
+              { type: 'image_url', image_url: { url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' } }
+            ]}
+          ],
+          max_tokens: 10
+        })
+      });
+      if (resp.ok) {
+        el.className = 'test-result success';
+        el.textContent = (currentLang === 'zh' ? '✅ 模型 ' : '✅ Model ') + testModel + (currentLang === 'zh' ? ' 支持多模态输入' : ' supports multimodal input');
+      } else {
+        el.className = 'test-result fail';
+        el.textContent = (currentLang === 'zh' ? '⚠️ 模型 ' : '⚠️ Model ') + testModel + (currentLang === 'zh' ? ' 不支持图片输入（或需特定格式）' : ' does not support image input');
+      }
+    } catch (err) {
+      el.className = 'test-result fail';
+      el.textContent = (currentLang === 'zh' ? '⚠️ 多模态测试请求失败: ' : '⚠️ Multimodal test failed: ') + err.message;
+    }
+    return;
+  }
+
+  el.className = 'test-result fail';
+  el.textContent = currentLang === 'zh' ? '⚠️ 未检测到多模态模型，请先测试连接' : '⚠️ No multimodal model, please test connection first';
+}
+
+// ======================== PTY Terminal (xterm.js) ========================
+let ptyTerm = null;
+let ptyFitAddon = null;
+let ptySocket = null;
+
+function updatePtyStatus(state) {
+  const el = document.getElementById('ptyStatus');
+  if (!el) return;
+  const map = {
+    idle: ['● idle', '#888'],
+    connecting: ['● connecting...', '#f0ad4e'],
+    connected: ['● connected', '#5cb85c'],
+    disconnected: ['● disconnected', '#d9534f'],
+    error: ['● error', '#d9534f'],
+  };
+  const [text, color] = map[state] || map.idle;
+  el.textContent = text;
+  el.style.color = color;
+}
+
+function connectPty() {
+  const container = document.getElementById('terminalContainer');
+  if (!container) return;
+
+  if (!IS_PRODUCTION || typeof Terminal === 'undefined') {
+    container.innerHTML = '<div style="padding:20px;color:var(--gray);text-align:center">' +
+      (currentLang === 'zh' ? '终端在本地模式不可用' : 'Terminal unavailable in local mode') +
+      '</div>';
+    updatePtyStatus('idle');
+    return;
+  }
+
+  // Cleanup old
+  if (ptySocket) { ptySocket.close(); ptySocket = null; }
+  if (ptyTerm) { ptyTerm.dispose(); ptyTerm = null; }
+
+  container.innerHTML = '';
+  ptyTerm = new Terminal({
+    cursorBlink: true, cursorStyle: 'block', fontSize: 13,
+    fontFamily: 'Consolas, "Courier New", monospace',
+    theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4' },
+    allowProposedApi: true,
+  });
+  ptyFitAddon = new FitAddon.FitAddon();
+  ptyTerm.loadAddon(ptyFitAddon);
+  ptyTerm.open(container);
+  // Ensure the terminal captures keyboard input on click
+  container.addEventListener('click', () => ptyTerm.focus());
+  container.style.cursor = 'text';
+  setTimeout(() => { try { ptyFitAddon.fit(); } catch(e) {} }, 100);
+
+  updatePtyStatus('connecting');
+  ptyTerm.write('Connecting to Hermes CLI...\r\n');
+
+  // Fetch session token, then connect WebSocket
+  fetch('/api/token').then(r => r.json()).then(data => {
+    const token = data.token;
+    if (!token) { ptyTerm.write('Error: No session token\r\n'); updatePtyStatus('error'); return; }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = protocol + '//' + window.location.host + '/api/pty?token=' + encodeURIComponent(token);
+
+    ptySocket = new WebSocket(wsUrl);
+    ptySocket.binaryType = 'arraybuffer';
+
+    ptySocket.onopen = () => {
+      updatePtyStatus('connected');
+      ptyTerm.clear();
+      ptyTerm.focus();
+      sendPtyResize();
+      // Also focus the fallback input
+      const inp = document.getElementById('ptyInput');
+      if (inp) setTimeout(() => inp.focus(), 200);
+    };
+    ptySocket.onmessage = (e) => {
+      if (typeof e.data === 'string') {
+        ptyTerm.write(e.data);
+      } else if (e.data instanceof ArrayBuffer) {
+        ptyTerm.write(new Uint8Array(e.data));
+      } else if (e.data instanceof Blob) {
+        e.data.arrayBuffer().then(buf => ptyTerm.write(new Uint8Array(buf)));
+      }
+    };
+    ptySocket.onclose = () => {
+      updatePtyStatus('disconnected');
+      ptyTerm.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+    };
+    ptySocket.onerror = () => { updatePtyStatus('error'); };
+
+    try {
+      ptyTerm.onData(data => {
+        if (ptySocket && ptySocket.readyState === WebSocket.OPEN) {
+          ptySocket.send(data);
+        }
+      });
+    } catch(e) {
+      console.warn('xterm onData failed:', e);
+    }
+  }).catch(e => {
+    ptyTerm.write('Error: ' + e.message + '\r\n');
+    updatePtyStatus('error');
+  });
+}
+
+// Fallback input box handler
+(function initPtyInput() {
+  const input = document.getElementById('ptyInput');
+  const inputStatus = document.getElementById('ptyInputStatus');
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      if (ptySocket && ptySocket.readyState === WebSocket.OPEN) {
+        ptySocket.send(input.value + '\n');
+        input.value = '';
+      } else {
+        inputStatus.textContent = '● disconnected';
+        inputStatus.style.color = '#d9534f';
+      }
+    }
+  });
+  // Sync status with terminal status
+  const origUpdate = updatePtyStatus;
+  window._origUpdatePtyStatus = origUpdate;
+  updatePtyStatus = function(state) {
+    origUpdate(state);
+    if (inputStatus) {
+      const map = {
+        idle: ['● idle', '#888'],
+        connecting: ['● connecting...', '#f0ad4e'],
+        connected: ['● connected', '#5cb85c'],
+        disconnected: ['● disconnected', '#d9534f'],
+        error: ['● error', '#d9534f'],
+      };
+      const [text, color] = map[state] || map.idle;
+      inputStatus.textContent = text;
+      inputStatus.style.color = color;
+    }
+    if (state === 'connected') {
+      input.focus();
+      input.disabled = false;
+      input.placeholder = 'Type here...';
+    } else {
+      input.disabled = true;
+      input.placeholder = state === 'connecting' ? 'Connecting...' : 'Disconnected';
+    }
+  };
+  input.disabled = true;
+})();
+
+function sendPtyResize() {
+  if (!ptyTerm || !ptySocket || ptySocket.readyState !== WebSocket.OPEN) return;
+  if (ptyFitAddon) {
+    const dims = ptyFitAddon.proposeDimensions();
+    if (dims) ptySocket.send(`\x1B[RESIZE:${dims.cols};${dims.rows}]`);
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (ptyFitAddon) { try { ptyFitAddon.fit(); } catch(e) {} sendPtyResize(); }
+});
+
+// Connect PTY when CLI tab is shown for first time
+(function() {
+  let ptyStarted = false;
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (tab.dataset.tab === 'cli' && !ptyStarted) {
+        ptyStarted = true;
+        setTimeout(connectPty, 150);
+      }
+    });
+  });
+  if (document.querySelector('.tab.active')?.dataset.tab === 'cli') {
+    ptyStarted = true;
+    setTimeout(connectPty, 300);
+  }
+})();
+
+// ======================== Usage Stats ========================
+let modelUsageData = [
+  { model: 'deepseek-v4-flash', input: 852340, output: 623450, requests: 3120, cacheHits: 2415, cacheMisses: 705 },
+  { model: 'gpt-4o', input: 420180, output: 289340, requests: 1580, cacheHits: 1020, cacheMisses: 560 },
+  { model: 'claude-3-haiku', input: 289820, output: 180490, requests: 940, cacheHits: 510, cacheMisses: 430 },
+  { model: 'deepseek-coder', input: 120000, output: 70000, requests: 380, cacheHits: 295, cacheMisses: 85 },
+  { model: 'sensenova-6.7-flash-lite', input: 120000, output: 70000, requests: 310, cacheHits: 140, cacheMisses: 170 },
+];
+
+function getModelUsageTotals() {
+  let t = { input: 0, output: 0, requests: 0, cacheHits: 0, cacheMisses: 0 };
+  modelUsageData.forEach(m => { t.input += m.input; t.output += m.output; t.requests += m.requests; t.cacheHits += m.cacheHits; t.cacheMisses += m.cacheMisses; });
+  return t;
+}
+
+function formatNum(n) { return (n || 0).toLocaleString(); }
+
+function renderStats() {
+  const t = getModelUsageTotals();
+  document.getElementById('statTotalTokens').textContent = formatNum(t.input + t.output);
+  document.getElementById('statInputTokens').textContent = formatNum(t.input);
+  document.getElementById('statOutputTokens').textContent = formatNum(t.output);
+  document.getElementById('statSessions').textContent = formatNum(t.requests);
+}
+
+function getCacheLevel(rate) {
+  if (rate >= 65) return 'high';
+  if (rate >= 35) return 'mid';
+  return 'low';
+}
+
+function renderModelStats() {
+  renderStats();
+  const container = document.getElementById('modelStatsGrid');
+  const maxInput = Math.max(...modelUsageData.map(m => m.input), 1);
+  const maxOutput = Math.max(...modelUsageData.map(m => m.output), 1);
+
+  container.innerHTML = modelUsageData.map(m => {
+    const cacheRate = m.cacheHits + m.cacheMisses > 0
+      ? Math.round(m.cacheHits / (m.cacheHits + m.cacheMisses) * 100)
+      : 0;
+    const cacheLevel = getCacheLevel(cacheRate);
+    const inputPct = (m.input / maxInput * 100).toFixed(1);
+    const outputPct = (m.output / maxOutput * 100).toFixed(1);
+    return `<div class="model-stat-card">
+      <div class="model-stat-header">
+        <span class="model-stat-name">${m.model}</span>
+        <span class="model-stat-reqs">${formatNum(m.requests)} ${t('usage.requests')}</span>
+      </div>
+      <div>
+        <div class="model-stat-bar-group">
+          <div class="model-stat-bar-label">
+            <span>${t('usage.cacheRate')}</span>
+            <span>${cacheRate}%</span>
+          </div>
+          <div class="model-stat-bar">
+            <div class="fill fill-cache ${cacheLevel}" style="width:${Math.max(cacheRate, 2)}%"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="model-stat-bar-group">
+          <div class="model-stat-bar-label">
+            <span>${t('usage.input')}</span>
+            <span>${formatNum(m.input)}</span>
+          </div>
+          <div class="model-stat-bar">
+            <div class="fill fill-input" style="width:${inputPct}%"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="model-stat-bar-group">
+          <div class="model-stat-bar-label">
+            <span>${t('usage.output')}</span>
+            <span>${formatNum(m.output)}</span>
+          </div>
+          <div class="model-stat-bar">
+            <div class="fill fill-output" style="width:${outputPct}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+renderStats();
+
+// ======================== Gateway Control ========================
+let gateways = [
+  { id: 'webui', name: 'WebUI', icon: '🌐', descKey: 'Web Dashboard', status: 'active', port: 8648 },
+  { id: 'api_server', name: 'API Server', icon: '🔌', descKey: 'OpenAI API', status: 'inactive' },
+  { id: 'feishu', name: 'Feishu', icon: '📘', descKey: 'Lark/Feishu Bot', status: 'inactive' },
+  { id: 'telegram', name: 'Telegram', icon: '✈', descKey: 'Telegram Bot', status: 'inactive' },
+  { id: 'wechat', name: 'WeChat', icon: '💬', descKey: 'WeChat Official', status: 'inactive' },
+  { id: 'discord', name: 'Discord', icon: '🎮', descKey: 'Discord Bot', status: 'inactive' },
+  { id: 'slack', name: 'Slack', icon: '🔷', descKey: 'Slack App', status: 'inactive' },
+];
+
+function renderGateways() {
+  const list = document.getElementById('gatewayList');
+  list.innerHTML = gateways.map(g => {
+    const statusClass = g.status === 'active' ? 'active' : g.status === 'error' ? 'error' : 'inactive';
+    const statusText = g.status === 'active' ? t('gateway.status.active') : g.status === 'error' ? t('gateway.status.error') : t('gateway.status.inactive');
+    const icons = { webui: '🌐', feishu: '📘', telegram: '✈', wechat: '💬', discord: '🎮', slack: '🔷' };
+    return `<div class="gateway-item">
+      <div class="gateway-info">
+        <div class="gateway-icon" style="background:${g.status === 'active' ? 'var(--green-bg)' : '#f5f5f5'}">${icons[g.id] || '🔌'}</div>
+        <div>
+          <div class="gateway-name">${g.name} ${g.port ? '<span style="font-weight:400;color:var(--gray-light);font-size:12px">:' + g.port + '</span>' : ''}</div>
+          <div class="gateway-desc">${g.descKey}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="gateway-status"><span class="dot ${statusClass}"></span>${statusText}</span>
+        <label class="toggle">
+          <input type="checkbox" ${g.status === 'active' ? 'checked' : ''} onchange="toggleGateway('${g.id}', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleGateway(id, on) {
+  const g = gateways.find(x => x.id === id);
+  if (!g) return;
+  g.status = on ? 'active' : 'inactive';
+  renderGateways();
+}
+
+renderGateways();
+
+// ======================== API Service ========================
+const IS_PRODUCTION = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+let API_TOKEN = null;
+
+async function apiInit() {
+  if (!IS_PRODUCTION) return;
+  try {
+    const res = await fetch('/api/token');
+    if (res.ok) {
+      const data = await res.json();
+      API_TOKEN = data.token;
+    }
+    // Get current server target
+    const tRes = await fetch('/api/target');
+    if (tRes.ok) {
+      const tData = await tRes.json();
+      window._hermesTarget = tData.target;
+    }
+  } catch (e) { /* local mode */ }
+}
+
+function apiHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (API_TOKEN) h['X-Hermes-Session-Token'] = API_TOKEN;
+  return h;
+}
+
+async function apiGet(path) {
+  if (!IS_PRODUCTION) throw new Error('local mode');
+  const res = await fetch('/api' + path, { headers: apiHeaders() });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  if (!IS_PRODUCTION) throw new Error('local mode');
+  const res = await fetch('/api' + path, {
+    method: 'POST', headers: apiHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function apiPut(path, body) {
+  if (!IS_PRODUCTION) throw new Error('local mode');
+  const res = await fetch('/api' + path, {
+    method: 'PUT', headers: apiHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function apiDelete(path) {
+  if (!IS_PRODUCTION) throw new Error('local mode');
+  const res = await fetch('/api' + path, {
+    method: 'DELETE', headers: apiHeaders(),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// ======================== Init ========================
+apiInit().then(() => {
+  applyI18n();
+  renderModelStats();
+  if (IS_PRODUCTION) fetchRealData();
+});
+if (!IS_PRODUCTION) { applyI18n(); renderModelStats(); }
+
+async function fetchRealData() {
+  try { await loadProviders(); } catch (e) { console.log('[api] providers fail:', e.message); }
+  try { await loadAnalytics(); } catch (e) { console.log('[api] analytics fail:', e.message); }
+  try { await loadGateways(); } catch (e) { console.log('[api] gateways fail:', e.message); }
+}
+
+async function loadProviders() {
+  const modelOpts = await apiGet('/model/options');
+  if (modelOpts && modelOpts.providers) {
+    providers = modelOpts.providers.map(p => ({
+      id: p.slug, name: p.name, models: p.models,
+      baseUrl: p.api_url || '',
+      status: 'online',
+      source: p.source || '',
+    }));
+    renderProviders();
+  }
+}
+
+async function loadAnalytics() {
+  const modelStats = await apiGet('/analytics/models?days=7');
+  if (modelStats && modelStats.models) {
+    modelUsageData.length = 0;
+    modelStats.models.forEach(m => {
+      const crt = m.cache_read_tokens || 0;
+      const inp = m.input_tokens || 0;
+      modelUsageData.push({
+        model: m.model + ' (' + (m.provider || '') + ')',
+        input: inp,
+        output: m.output_tokens || 0,
+        requests: m.api_calls || 0,
+        cacheHits: crt,
+        cacheMisses: inp,
+      });
+    });
+    renderModelStats();
+  }
+}
+
+async function loadGateways() {
+  const status = await apiGet('/status');
+  if (status && status.gateway_platforms) {
+    const knownIds = gateways.map(g => g.id);
+    Object.entries(status.gateway_platforms).forEach(([id, info]) => {
+      if (knownIds.includes(id)) {
+        const g = gateways.find(x => x.id === id);
+        if (g) g.status = info.state === 'connected' ? 'active' : 'inactive';
+      } else {
+        gateways.push({
+          id, name: id.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
+          icon: getGatewayIcon(id), descKey: info.state,
+          status: info.state === 'connected' ? 'active' : 'inactive',
+        });
+      }
+    });
+    renderGateways();
+  }
+}
+
+function getGatewayIcon(id) {
+  const icons = { webui: '🌐', feishu: '📘', telegram: '✈', wechat: '💬', discord: '🎮', slack: '🔷',
+    whatsapp: '📱', signal: '🔒', email: '📧', homeassistant: '🏠', api_server: '🔌' };
+  return icons[id] || '🔌';
+}
+</script>
+</body>
+</html>
